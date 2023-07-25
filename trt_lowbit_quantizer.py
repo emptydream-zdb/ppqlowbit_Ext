@@ -65,7 +65,8 @@ class TrtLowBitQuantizer(BaseQuantizer):
                     )
                     conv_weight_config.quant_min = -pow(2, self.num_of_bits - 1)
                     conv_weight_config.quant_max = pow(2, self.num_of_bits - 1) - 1
-                    conv_weight_config.channel_axis = (
+                    if self.per_channel:
+                        conv_weight_config.channel_axis = (
                         1 if operation.type == 'ConvTranspose' else 0)
                     conv_weight_config.observer_algorithm = 'minmax'
 

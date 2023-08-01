@@ -10,7 +10,7 @@ from ppq.executor import TorchExecutor
 from ppq.IR import BaseGraph
 from ppq.api import load_onnx_graph, dispatch_graph
 from ppq.utils.round import ppq_tensor_round
-from .trt_lowbit_quantizer import TrtLowBitQuantizer
+from .trt_lowbit_quantizer import TrtLowBitQuantizer, TrtLowBitQuantizer_cus
 
 
 def quantize_onnx_model_lowbit(

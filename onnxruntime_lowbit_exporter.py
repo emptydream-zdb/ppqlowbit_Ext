@@ -3,6 +3,7 @@ from typing import Dict, List
 import onnx
 import torch
 from onnx import helper
+from .api import PPQLinearQuant_toInt_My
 
 from ppq.core import (GRAPH_OPSET_ATTRIB, PPQ_CONFIG,
                       QuantizationProperty, QuantizationStates,
@@ -12,7 +13,8 @@ from ppq.IR import (BaseGraph, Operation, QuantableOperation,
                     QuantableVariable, Variable)
 from ppq.utils.round import ppq_tensor_round
 
-from ppq.parser.onnx_exporter import OnnxExporter, OP_CONVERTERS, OperationExporter
+from ppq.parser.onnx_exporter import OnnxExporter, OP_CONVERTERS, \
+    OperationExporter
 
 
 class QDQHelper():
@@ -29,7 +31,6 @@ class QDQHelper():
                 QuantizationProperty.LINEAR):
             if TQC.policy.has_property(QuantizationProperty.ASYMMETRICAL):
                 range_check = TQC.quant_max <= 255 and TQC.quant_min >= 0
-                print(range_check)
             else:
                 range_check = TQC.quant_max <= 127 and TQC.quant_min >= -128
         else:
@@ -49,7 +50,8 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
     低比特导出器，受限于onnx不支持4比特数据类型，只能用int8/uint8表示 导出的onnx模型图上看到为int8,实际是低比特
     """
 
-    def __init__(self, removed_activation_types: List[str] = ['Relu','Clip']) -> None:
+    def __init__(self, removed_activation_types: List[str] = ['Relu',
+                                                              'Clip']) -> None:
         super().__init__()
         self.removed_activation_types = removed_activation_types
 
@@ -66,7 +68,7 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
         value_dtype = torch.int8
         if config.policy.has_property(QuantizationProperty.ASYMMETRICAL):
             offset_dtype = torch.uint8
-            value_dtype  = torch.uint8
+            value_dtype = torch.uint8
         return offset_dtype, value_dtype
 
     def insert_quantize_node(
@@ -266,15 +268,15 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                 config = op.config.output_quantization_config[0]
                 # Only ASYMMETRICAL quantized activations can be safely removed.
                 if config.policy.has_property(
-                    QuantizationProperty.SYMMETRICAL): continue
+                        QuantizationProperty.SYMMETRICAL): continue
 
                 if not isinstance(config.scale, torch.Tensor): continue
                 if not isinstance(config.offset, torch.Tensor): continue
 
                 range_min = (config.scale * (
-                            config.quant_min - config.offset)).min().item()
+                        config.quant_min - config.offset)).min().item()
                 range_max = (config.scale * (
-                            config.quant_max - config.offset)).max().item()
+                        config.quant_max - config.offset)).max().item()
 
                 if op.type == 'Relu':
                     if range_min >= 0:
@@ -307,9 +309,9 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
             if not isinstance(upstream_op, QuantableOperation): continue
             if len(graph.get_downstream_operations(upstream_op)) != 1: continue
             input_var, input_cfg = op.inputs[0], \
-            op.config.input_quantization_config[0]
+                op.config.input_quantization_config[0]
             if not input_cfg.policy.has_property(
-                QuantizationProperty.ASYMMETRICAL): continue
+                    QuantizationProperty.ASYMMETRICAL): continue
 
             # PATCH 20220304 Removing graph output op might cause error.
             if op.outputs[0].name in graph.outputs:
@@ -324,7 +326,7 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                 assert input_var.source_op.num_of_input == 3, 'Quantize Node Format Error, need as least 3 inputs.'
                 assert isinstance(input_var.source_op, Operation)
                 scale, offset = input_var.source_op.inputs[1].value, \
-                input_var.source_op.inputs[2].value
+                    input_var.source_op.inputs[2].value
 
                 scale_diff = torch.max(torch.abs(scale - config.scale)).item()
                 zeropoint_diff = torch.max(
@@ -338,7 +340,7 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                            0].num_of_input == 3, 'Quantize Node Format Error, need as least 3 inputs.'
                 assert isinstance(output_var.dest_ops[0], Operation)
                 scale, offset = output_var.dest_ops[0].inputs[1].value, \
-                output_var.dest_ops[0].inputs[2].value
+                    output_var.dest_ops[0].inputs[2].value
 
                 scale_diff = torch.max(torch.abs(scale - config.scale)).item()
                 zeropoint_diff = torch.max(
@@ -502,7 +504,7 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                 if quantized_param and config.policy.has_property(
                         QuantizationProperty.LINEAR):
                     var.value = PPQLinearQuant_toInt_My(tensor=var.value,
-                                                     config=config)
+                                                        config=config)
 
             elif (not var.is_parameter):
 
@@ -513,7 +515,7 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                     assert var.source_op.num_of_input == 3, 'Quantize Node Format Error, need as least 3 inputs.'
                     assert isinstance(var.source_op, Operation)
                     scale, offset = var.source_op.inputs[1].value, \
-                    var.source_op.inputs[2].value
+                        var.source_op.inputs[2].value
 
                     scale_diff = torch.max(
                         torch.abs(scale - config.scale)).item()
@@ -528,7 +530,7 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                                0].num_of_input == 3, 'Quantize Node Format Error, need as least 3 inputs.'
                     assert isinstance(var.dest_ops[0], Operation)
                     scale, offset = var.dest_ops[0].inputs[1].value, \
-                    var.dest_ops[0].inputs[2].value
+                        var.dest_ops[0].inputs[2].value
 
                     scale_diff = torch.max(
                         torch.abs(scale - config.scale)).item()
@@ -698,25 +700,3 @@ class ONNXRUNTIMLowBitExporter(OnnxExporter):
                 ppq_warning(f'{op.name} (bitwidth != 8)')
             ppq_warning(
                 'For Generating onnxruntime-executable Model, use TargetPlatform = Onnxruntime or OnnxruntimeQuantizer instead.')
-            
-def PPQLinearQuant_toInt_My(tensor: torch.Tensor, config: TensorQuantizationConfig) -> torch.Tensor:
-    """ppq源码里的量化函数"""
-    if not config.policy.has_property(QuantizationProperty.LINEAR):
-        raise ValueError('Critical Quantization Error! Non-linear config detected.')
-    if config.policy.has_property(QuantizationProperty.PER_CHANNEL):
-        shape = [1 if axis != config.channel_axis else -1 for axis in range(tensor.ndim)]
-        scale, offset = config.scale.view(shape), config.offset.view(shape)
-        tensor = ppq_tensor_round((tensor / scale), config.rounding) + offset
-        tensor = torch.clamp(tensor, config.quant_min, config.quant_max)
-    elif config.policy.has_property(QuantizationProperty.PER_TENSOR):
-        tensor = ppq_tensor_round((tensor / config.scale), config.rounding) + config.offset
-        tensor = torch.clamp(tensor, config.quant_min, config.quant_max)
-
-    if config.num_of_bits <= 8:  # 源码里写死的8,就提出来自己改一下
-        if config.policy.has_property(QuantizationProperty.SYMMETRICAL):
-            return tensor.type(dtype=torch.int8)
-        if config.policy.has_property(QuantizationProperty.ASYMMETRICAL):
-            return tensor.type(dtype=torch.uint8)
-    elif config.num_of_bits > 8:
-        return tensor.type(dtype=torch.int32)
-    else: raise Exception('Do not konw how to convert value into int. num of bits is unexpected.')
